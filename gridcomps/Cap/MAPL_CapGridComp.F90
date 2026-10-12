@@ -1683,13 +1683,6 @@ contains
     type(ESMF_Time) :: currTime
 
     call ESMF_GridCompGet(this%gc, vm = this%vm)
-    ! Run the ExtData Component
-    ! --------------------------
-
-    call ESMF_GridCompRun(this%gcs(this%extdata_id), importState = this%child_imports(this%extdata_id), &
-         exportState = this%child_exports(this%extdata_id), &
-         clock = this%clock, userrc = status)
-    _VERIFY(status)
 
     ! Call Record for intermediate checkpoint (if desired)
     !  Note that we are not doing a Record for History.
@@ -1700,8 +1693,19 @@ contains
     call ESMF_ClockAdvance(this%clock, rc = status)
     _VERIFY(STATUS)
     call ESMF_ClockAdvance(this%clock_hist, rc = status)
-    _VERIFY(STATUS) 
+    _VERIFY(STATUS)
     end if
+
+    ! Run the ExtData Component
+    ! --------------------------
+    ! Run it after the clock has been stepped back, so that ExtData and the
+    ! gridded component see the same time, as in the forward step. The
+    ! adjoint can then use the forward ExtData.rc without shifted offsets.
+
+    call ESMF_GridCompRun(this%gcs(this%extdata_id), importState = this%child_imports(this%extdata_id), &
+         exportState = this%child_exports(this%extdata_id), &
+         clock = this%clock, userrc = status)
+    _VERIFY(status)
 
     ! Update Perpetual Clock
     ! ----------------------
