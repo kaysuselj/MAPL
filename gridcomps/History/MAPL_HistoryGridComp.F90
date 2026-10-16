@@ -1642,7 +1642,11 @@ contains
 
            ! New code in MAPL 2.55. Might need to be adapted for GCHP adjoint with code above.
            if ( list(n)%backwards ) then
-              list(n)%end_alarm = ESMF_AlarmCreate( clock=clock, RingTime=CurrTime, _RC )
+              ! GCHP adjoint: no end alarm for a backwards collection (MAPL 2.26 behaviour). The
+              ! MAPL 2.55+ alarm at CurrTime (= window end) rings at the last reverse step and
+              ! suppresses that record, i.e. the adjoint at the window START is never written.
+              list(n)%end_alarm = ESMF_AlarmCreate( clock=clock, RingTime=CurrTime, sticky=.false., &
+                                                    enabled=.false., _RC )
            else
               list(n)%end_alarm = ESMF_AlarmCreate( clock=clock, RingTime=CurrTime, sticky=.false., _RC )
            endif

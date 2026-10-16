@@ -146,7 +146,8 @@ module MaskSamplerMod
   interface
      module function MaskSampler_from_config(config,string,clock,GENSTATE,rc) result(mask)
        use BinIOMod
-       use pflogger, only         :  Logger, logging
+       ! (use pflogger removed: Logger/logging come from the host module; the
+       !  re-import crashes ifort 2021.10 / ifx 2023.2 and is rejected by ifx 2025.3)
        type(MaskSampler) :: mask
        type(ESMF_Config), intent(inout)        :: config
        character(len=*),  intent(in)           :: string
@@ -174,7 +175,8 @@ module MaskSamplerMod
      end subroutine finalize_
 
      module subroutine create_Geosat_grid_find_mask(this, rc)
-       use pflogger, only: Logger, logging
+       ! (use pflogger removed: Logger/logging come from the host module; the
+       !  re-import crashes ifort 2021.10 / ifx 2023.2 and is rejected by ifx 2025.3)
        implicit none
        class(MaskSampler), intent(inout) :: this
        integer, optional, intent(out)          :: rc
