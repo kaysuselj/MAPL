@@ -76,6 +76,7 @@ module MAPL_HistoryCollectionMod
      logical                            :: skipWriting
      logical                            :: subVm
      logical                            :: backwards ! Adds support for clock running in reverse direction
+     logical                            :: month_starts = .false. ! GCHP adjoint: backwards, write at month starts only
      logical                            :: useNewFormat
      real                               :: vscale
      character(len=ESMF_MAXSTR)         :: vunit

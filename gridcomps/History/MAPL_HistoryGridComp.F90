@@ -1012,6 +1012,12 @@ contains
        call ESMF_ConfigGetAttribute ( cfg, reverse, default=0, &
                                       label=trim(string) // 'backwards:'  ,_RC )
        list(n)%backwards = (reverse /= 0)
+       ! GCHP adjoint: month_starts: 1 (backwards collections only) writes at 00:00 on the first of a month and at the
+       ! clock start time (the window start, the last reverse step) instead of every 'frequency'
+       call ESMF_ConfigGetAttribute ( cfg, reverse, default=0, &
+                                      label=trim(string) // 'month_starts:'  ,_RC )
+       list(n)%month_starts = (reverse /= 0)
+       _ASSERT(list(n)%backwards .or. .not. list(n)%month_starts, 'month_starts needs backwards: 1 in '//trim(string))
 
 !      Disable streams when frequencies, times are negative
 !      ----------------------------------------------------
@@ -3865,6 +3871,12 @@ ENDDO PARSER
          Writing(n) = ESMF_AlarmIsRinging ( Hsampler%alarm )
       else
          Writing(n) = ESMF_AlarmIsRinging ( list(n)%his_alarm )
+         ! GCHP adjoint: on the reverse clock a non-sticky ESMF alarm with an interval longer than the time step
+         ! rings once (at the first reverse step) and never again, so a backwards instantaneous collection decides
+         ! from the clock time: every 'frequency' from ref_date/ref_time, or at month starts (month_starts: 1)
+         if (list(n)%backwards .and. .not. FWD .and. .not. IntState%average(n)) then
+            Writing(n) = backwards_write_time(list(n), clock, _RC)
+         end if
       endif
 
 !      if(Writing(n)) then
@@ -5802,6 +5814,34 @@ ENDDO PARSER
 
     _RETURN(ESMF_SUCCESS)
   end subroutine CopyStateItems
+
+  ! GCHP adjoint: is the current (reverse) clock time an output time of the backwards collection?
+  function backwards_write_time(hist, clock, rc) result(w)
+     logical :: w
+     type(HistoryCollection), intent(in) :: hist
+     type(ESMF_Clock), intent(in) :: clock
+     integer, optional, intent(out) :: rc
+
+     integer :: status, dd, h, m, s, sec
+     integer(ESMF_KIND_I8) :: dsec
+     type(ESMF_Time) :: currTime, startTime, refTime
+     type(ESMF_Calendar) :: cal
+
+     call ESMF_ClockGet(clock, currTime=currTime, startTime=startTime, calendar=cal, _RC)
+     if (hist%month_starts) then
+        call ESMF_TimeGet(currTime, dd=dd, h=h, m=m, s=s, _RC)
+        w = (dd == 1 .and. h == 0 .and. m == 0 .and. s == 0) .or. (currTime == startTime)
+     else
+        call ESMF_TimeSet(refTime, yy=hist%ref_date/10000, mm=mod(hist%ref_date,10000)/100, &
+             dd=mod(hist%ref_date,100), h=hist%ref_time/10000, m=mod(hist%ref_time,10000)/100, &
+             s=mod(hist%ref_time,100), calendar=cal, _RC)
+        call ESMF_TimeIntervalGet(currTime - refTime, s_i8=dsec, _RC)
+        sec = MAPL_nsecf(hist%frequency)
+        w = sec > 0
+        if (w) w = mod(dsec, int(sec, ESMF_KIND_I8)) == 0
+     end if
+     _RETURN(_SUCCESS)
+  end function backwards_write_time
 
   function get_acc_offset(current_time,ref_time,rc) result(acc_offset)
      integer :: acc_offset
